@@ -65,10 +65,10 @@ Add to your `~/.openclaw/openclaw.json`:
             "fields": []
           },
           "headlessBrowser": {
-            "enabled": false,
-            "waitForSelector": "body",
-            "waitTimeMs": 3000,
-            "timeoutSeconds": 30
+            "enabled": false,           // Set to true to enable by default
+            "waitForSelector": "body",  // CSS selector to wait for
+            "waitTimeMs": 3000,         // Milliseconds to wait for JS
+            "timeoutSeconds": 30        // Browser timeout
           }
         }
       }
@@ -76,6 +76,8 @@ Add to your `~/.openclaw/openclaw.json`:
   }
 }
 ```
+
+**Note:** `headlessBrowser.enabled` in config only sets the **default**. You can always override per-request with `use_headless=True/False`.
 
 Then restart the gateway:
 
@@ -196,38 +198,127 @@ Extract clean, readable content from any URL.
 | `include_images` | boolean | ❌ No | true | Include image URLs |
 | `include_links` | boolean | ❌ No | true | Include link URLs |
 | `max_content_length` | number | ❌ No | 10000 | Max content length in characters |
-| `use_headless` | boolean | ❌ No | false | Use headless browser for JS rendering |
-| `wait_for_selector` | string | ❌ No | "body" | CSS selector to wait for |
-| `wait_time_ms` | number | ❌ No | 3000 | Time to wait for JS execution |
+| `use_headless` | boolean | ❌ No | `config.headlessBrowser.enabled` | Use headless browser for JS rendering |
+| `wait_for_selector` | string | ❌ No | `config.headlessBrowser.waitForSelector` | CSS selector to wait for |
+| `wait_time_ms` | number | ❌ No | `config.headlessBrowser.waitTimeMs` | Time to wait for JS execution |
 
-**Examples:**
+---
 
+### Headless Browser Configuration
+
+The `searxng_extract` tool supports **optional headless browser rendering** using Puppeteer for JavaScript-heavy websites.
+
+#### Configuration Hierarchy
+
+| Level | Priority | How to Set | Default |
+|-------|----------|------------|---------|
+| **1. Per Request** | Highest | Pass parameters to tool | - |
+| **2. Config File** | Medium | `~/.openclaw/openclaw.json` | See below |
+| **3. Hardcoded** | Lowest | Plugin defaults | `false` |
+
+#### Default Configuration (in `openclaw.json`):
+
+```json
+{
+  "plugins": {
+    "entries": {
+      "openclaw-searxng": {
+        "config": {
+          "headlessBrowser": {
+            "enabled": false,        // Default: disabled
+            "waitForSelector": "body", // Default: wait for body
+            "waitTimeMs": 3000,       // Default: 3 seconds
+            "timeoutSeconds": 30      // Default: 30 seconds
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+#### When to Use Headless Browser
+
+| Use Case | Method | Recommendation |
+|----------|--------|----------------|
+| Static HTML sites | Static fetch (default) | ✅ Faster, no dependencies |
+| JavaScript-heavy SPAs | Headless browser | ✅ Renders dynamic content |
+| Data dashboards | Headless browser | ✅ Waits for data to load |
+| Single page extraction | Either | Depends on site |
+| Bulk extraction | Static fetch | ✅ Much faster |
+
+#### Examples:
+
+**1. Static Fetch (Default - Fast)**
 ```python
-# Basic extraction
-searxng_extract("https://openclaw.ai")
+# Uses static fetch (no Puppeteer)
+# Fast, no browser startup time
+searxng_extract("https://example.com")
+```
 
-# Without images
-searxng_extract("https://example.com/article", include_images=False)
-
-# Limited content
-searxng_extract("https://example.com", max_content_length=5000)
-
-# With headless browser (for JavaScript-heavy sites)
+**2. Headless Browser (JavaScript Rendering)**
+```python
+# Enable headless browser for this request
 searxng_extract(
     "https://trends.google.com/trending?geo=ID",
     use_headless=True,
-    wait_for_selector="tbody tr",
-    wait_time_ms=5000
+    wait_for_selector="tbody tr",  # Wait for table rows
+    wait_time_ms=5000              # Wait 5 seconds for JS
 )
 ```
 
-**Headless Browser Setup:**
+**3. Override Config Defaults**
+```python
+# Use config defaults but override wait time
+searxng_extract(
+    "https://example.com",
+    use_headless=True,
+    wait_time_ms=10000  # Override: wait 10 seconds
+)
+```
+
+**4. Force Static (Even if Config Enabled)**
+```python
+# Disable headless even if config has enabled: true
+searxng_extract(
+    "https://example.com",
+    use_headless=False  # Force static fetch
+)
+```
+
+#### Headless Browser Setup:
 
 ```bash
 # Install Puppeteer (optional - only needed for JS rendering)
 cd ~/.openclaw/extensions/openclaw-searxng
 npm install puppeteer
+
+# Verify installation
+openclaw gateway restart
+# Check logs: should show "headlessBrowser=true" if enabled in config
 ```
+
+#### Response Metadata:
+
+```json
+{
+  "url": "https://example.com",
+  "title": "Example",
+  "content": "...",
+  "extractionMethod": "headless_browser",  // or "static_fetch"
+  "headlessBrowserUsed": true               // or false
+}
+```
+
+#### Common Selectors for `wait_for_selector`:
+
+| Site Type | Selector | Purpose |
+|-----------|----------|---------|
+| Google Trends | `tbody tr` | Wait for trend table |
+| React apps | `[data-loaded="true"]` | Wait for data load |
+| Dashboards | `.chart-loaded` | Wait for charts |
+| News sites | `article` | Wait for articles |
+| Generic | `body` | Wait for page load |
 
 **Response:**
 

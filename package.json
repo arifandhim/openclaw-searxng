@@ -33,7 +33,7 @@
     "@sinclair/typebox": "0.34.47"
   },
   "optionalDependencies": {
-    "puppeteer": "^22.0.0"
+    "puppeteer": "^22.15.0"
   },
   "peerDependencies": {
     "openclaw": ">=2025.0.0"

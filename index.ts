@@ -747,7 +747,6 @@ const searxngPlugin = {
           writeCache(EXTRACT_CACHE, cacheKey, resultWithMeta as Record<string, unknown>, cacheTtlMs);
 
           return { content: [{ type: "text" as const, text: JSON.stringify(resultWithMeta, null, 2) }], details: {} };
-        }
         },
       },
       { source: "openclaw-searxng" },

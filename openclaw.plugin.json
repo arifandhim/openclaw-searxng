@@ -2,8 +2,8 @@
   "id": "openclaw-searxng",
   "kind": "tools",
   "skills": ["./skills"],
-  "name": "SearXNG Local Search",
-  "description": "Local web search via SearXNG instance. Provides searxng_search tool for private, structured web search with full metadata, pagination, time filtering, and engine selection. No external API calls — all search data stays local.",
+  "name": "SearXNG Local Search Suite",
+  "description": "Comprehensive web research toolkit using local SearXNG instance. Provides: searxng_search (web search), searxng_extract (URL content extraction), searxng_crawl (website crawling), searxng_map (URL discovery), and searxng_research (multi-step research). All data stays local — no external API calls.",
   "version": "1.0.0",
   "configSchema": {
     "type": "object",

@@ -10,19 +10,55 @@ Exposes one agent tool:
 
 ## Installation
 
-```bash
-openclaw plugins install openclaw-searxng
-```
+### Install from Source (Recommended)
 
-Or install from source:
+This plugin is designed to be installed directly from the GitHub repository:
 
 ```bash
+# Clone to OpenClaw extensions directory
 git clone https://github.com/arifandhim/openclaw-searxng.git ~/.openclaw/extensions/openclaw-searxng
+
+# Install dependencies
 cd ~/.openclaw/extensions/openclaw-searxng
 npm install --omit=dev
+
+# Restart OpenClaw gateway
+openclaw gateway restart
 ```
 
-Then restart the gateway.
+### Configure OpenClaw
+
+Add to your `~/.openclaw/openclaw.json`:
+
+```json
+{
+  "plugins": {
+    "allow": ["openclaw-searxng"],
+    "entries": {
+      "openclaw-searxng": {
+        "enabled": true,
+        "config": {
+          "baseUrl": "http://localhost:8888",
+          "defaultSafeSearch": 0,
+          "defaultLanguage": "auto",
+          "timeoutSeconds": 30,
+          "cacheTtlMinutes": 15,
+          "rateLimit": {
+            "maxRequests": 60,
+            "windowMs": 60000
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Then restart the gateway:
+
+```bash
+openclaw gateway restart
+```
 
 ## Prerequisites
 
@@ -203,7 +239,6 @@ searxng_search(
 
 ## Links
 
-- npm: [openclaw-searxng](https://www.npmjs.com/package/openclaw-searxng)
 - GitHub: [arifandhim/openclaw-searxng](https://github.com/arifandhim/openclaw-searxng)
 - SearXNG: [github.com/searxng/searxng](https://github.com/searxng/searxng)
 - OpenClaw plugin docs: [docs.openclaw.ai/tools/plugin](https://docs.openclaw.ai/tools/plugin)
@@ -215,3 +250,7 @@ searxng_search(
 ## License
 
 MIT
+
+---
+
+**Note:** This plugin is distributed via GitHub source only. Install by cloning the repository to your OpenClaw extensions directory.

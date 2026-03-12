@@ -47,6 +47,37 @@
             "description": "Time window in milliseconds. Default: 60000 (1 minute)"
           }
         }
+      },
+      "responseFormat": {
+        "type": "object",
+        "description": "Response format configuration",
+        "properties": {
+          "includeMetadata": {
+            "type": "boolean",
+            "description": "Include metadata (tookMs, baseUrl, etc). Default: true"
+          },
+          "includeSuggestions": {
+            "type": "boolean",
+            "description": "Include search suggestions. Default: true"
+          },
+          "includeInfoboxes": {
+            "type": "boolean",
+            "description": "Include infoboxes. Default: true"
+          },
+          "includeUnresponsive": {
+            "type": "boolean",
+            "description": "Include unresponsive engines. Default: true"
+          },
+          "maxResults": {
+            "type": "number",
+            "description": "Maximum results to return (0 = unlimited). Default: 0"
+          },
+          "fields": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Fields to include in results (empty = all). Default: []"
+          }
+        }
       }
     }
   },
@@ -92,6 +123,35 @@
     "rateLimit.windowMs": {
       "label": "Window (ms)",
       "help": "Time window in milliseconds"
+    },
+    "responseFormat": {
+      "label": "Response Format",
+      "help": "Configure which fields to include in responses",
+      "advanced": true
+    },
+    "responseFormat.includeMetadata": {
+      "label": "Include Metadata",
+      "help": "Include tookMs, baseUrl, etc."
+    },
+    "responseFormat.includeSuggestions": {
+      "label": "Include Suggestions",
+      "help": "Include search suggestions"
+    },
+    "responseFormat.includeInfoboxes": {
+      "label": "Include Infoboxes",
+      "help": "Include knowledge panels"
+    },
+    "responseFormat.includeUnresponsive": {
+      "label": "Include Unresponsive",
+      "help": "Include failed engines list"
+    },
+    "responseFormat.maxResults": {
+      "label": "Max Results",
+      "help": "Limit number of results (0 = unlimited)"
+    },
+    "responseFormat.fields": {
+      "label": "Fields",
+      "help": "Specific fields to include (empty = all)"
     }
   }
 }

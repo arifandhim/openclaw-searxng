@@ -180,6 +180,39 @@ function resolveRateLimit(cfg: Record<string, unknown>): { maxRequests: number; 
   return { maxRequests, windowMs };
 }
 
+// Response format configuration
+type ResponseFormatConfig = {
+  includeMetadata: boolean;
+  includeSuggestions: boolean;
+  includeInfoboxes: boolean;
+  includeUnresponsive: boolean;
+  maxResults: number;
+  fields: string[];
+};
+
+function resolveResponseFormat(cfg: Record<string, unknown>): ResponseFormatConfig {
+  const fmtCfg = typeof cfg.responseFormat === "object" && cfg.responseFormat !== null ? cfg.responseFormat as Record<string, unknown> : {};
+  return {
+    includeMetadata: typeof fmtCfg.includeMetadata === "boolean" ? fmtCfg.includeMetadata : true,
+    includeSuggestions: typeof fmtCfg.includeSuggestions === "boolean" ? fmtCfg.includeSuggestions : true,
+    includeInfoboxes: typeof fmtCfg.includeInfoboxes === "boolean" ? fmtCfg.includeInfoboxes : true,
+    includeUnresponsive: typeof fmtCfg.includeUnresponsive === "boolean" ? fmtCfg.includeUnresponsive : true,
+    maxResults: typeof fmtCfg.maxResults === "number" ? Math.max(0, Math.floor(fmtCfg.maxResults)) : 0,
+    fields: Array.isArray(fmtCfg.fields) ? fmtCfg.fields.filter((f): f is string => typeof f === "string") : [],
+  };
+}
+
+function filterResultFields(result: Record<string, unknown>, fields: string[]): Record<string, unknown> {
+  if (fields.length === 0) return result;
+  const filtered: Record<string, unknown> = {};
+  for (const field of fields) {
+    if (field in result) {
+      filtered[field] = result[field];
+    }
+  }
+  return filtered;
+}
+
 function siteName(url: string): string | undefined {
   try {
     return new URL(url).hostname;
@@ -251,11 +284,14 @@ const searxngPlugin = {
     const defaultTimeout = resolveTimeout(cfg);
     const cacheTtlMs = resolveCacheTtlMs(cfg);
     const rateLimit = resolveRateLimit(cfg);
+    const responseFormat = resolveResponseFormat(cfg);
 
     api.logger.info(
       `searxng: initialized (baseUrl=${baseUrl}, safeSearch=${defaultSafeSearch}, ` +
         `language=${defaultLanguage}, timeout=${defaultTimeout}s, cacheTtl=${Math.round(cacheTtlMs / 60000)}min, ` +
-        `rateLimit=${rateLimit.maxRequests}/${rateLimit.windowMs}ms)`,
+        `rateLimit=${rateLimit.maxRequests}/${rateLimit.windowMs}ms, ` +
+        `format=[metadata:${responseFormat.includeMetadata},suggestions:${responseFormat.includeSuggestions},` +
+        `infoboxes:${responseFormat.includeInfoboxes},unresponsive:${responseFormat.includeUnresponsive}])`,
     );
 
     // Periodic cleanup of rate limit entries
@@ -443,7 +479,7 @@ const searxngPlugin = {
           const tookMs = Date.now() - start;
 
           // --- format results ---
-          const results = (data.results ?? []).map((r) => ({
+          let results = (data.results ?? []).map((r) => ({
             title: r.title || "",
             url: r.url || "",
             snippet: r.content || "",
@@ -456,26 +492,41 @@ const searxngPlugin = {
             siteName: siteName(r.url) || undefined,
           }));
 
+          // Apply maxResults limit
+          if (responseFormat.maxResults > 0 && results.length > responseFormat.maxResults) {
+            results = results.slice(0, responseFormat.maxResults);
+          }
+
+          // Filter fields if specified
+          if (responseFormat.fields.length > 0) {
+            results = results.map((r) => filterResultFields(r, responseFormat.fields) as typeof r);
+          }
+
           const payload: Record<string, unknown> = {
             query: data.query ?? query,
             provider: "searxng",
-            page,
-            numberOfResults: data.number_of_results,
-            resultCount: results.length,
-            tookMs,
-            baseUrl: callBaseUrl,
             results,
           };
 
-          if (data.suggestions && data.suggestions.length > 0) {
+          // Add metadata if enabled
+          if (responseFormat.includeMetadata) {
+            payload.page = page;
+            payload.numberOfResults = data.number_of_results;
+            payload.resultCount = results.length;
+            payload.tookMs = tookMs;
+            payload.baseUrl = callBaseUrl;
+          }
+
+          // Add optional fields based on config
+          if (responseFormat.includeSuggestions && data.suggestions && data.suggestions.length > 0) {
             payload.suggestions = data.suggestions;
           }
 
-          if (data.infoboxes && data.infoboxes.length > 0) {
+          if (responseFormat.includeInfoboxes && data.infoboxes && data.infoboxes.length > 0) {
             payload.infoboxes = data.infoboxes;
           }
 
-          if (data.unresponsive_engines && data.unresponsive_engines.length > 0) {
+          if (responseFormat.includeUnresponsive && data.unresponsive_engines && data.unresponsive_engines.length > 0) {
             payload.unresponsiveEngines = data.unresponsive_engines;
           }
 

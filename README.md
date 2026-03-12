@@ -60,7 +60,11 @@ Or configure it in `~/.openclaw/openclaw.json`:
           "defaultLanguage": "auto",
           "defaultEngines": "google,brave",
           "timeoutSeconds": 30,
-          "cacheTtlMinutes": 15
+          "cacheTtlMinutes": 15,
+          "rateLimit": {
+            "maxRequests": 60,
+            "windowMs": 60000
+          }
         }
       }
     }
@@ -78,6 +82,8 @@ Or configure it in `~/.openclaw/openclaw.json`:
 | `defaultEngines` | string | — | Default engines (comma-separated) |
 | `timeoutSeconds` | number | 30 | Request timeout |
 | `cacheTtlMinutes` | number | 15 | Cache TTL (0 to disable) |
+| `rateLimit.maxRequests` | number | 60 | Max requests per window |
+| `rateLimit.windowMs` | number | 60000 | Rate limit window in ms |
 
 ## Usage
 

@@ -71,6 +71,8 @@ const DEFAULT_SAFE_SEARCH = 0;
 const DEFAULT_LANGUAGE = "auto";
 const DEFAULT_TIMEOUT_SECONDS = 30;
 const DEFAULT_CACHE_TTL_MINUTES = 15;
+const DEFAULT_RATE_LIMIT_MAX = 60;
+const DEFAULT_RATE_LIMIT_WINDOW_MS = 60000;
 const MAX_CACHE_ENTRIES = 100;
 
 // ---------------------------------------------------------------------------
@@ -78,6 +80,44 @@ const MAX_CACHE_ENTRIES = 100;
 // ---------------------------------------------------------------------------
 
 const SEARCH_CACHE = new Map<string, CacheEntry>();
+
+// ---------------------------------------------------------------------------
+// Rate Limiting
+// ---------------------------------------------------------------------------
+
+type RateLimitEntry = {
+  count: number;
+  resetAt: number;
+};
+
+const RATE_LIMIT_MAP = new Map<string, RateLimitEntry>();
+
+function checkRateLimit(key: string, maxRequests: number, windowMs: number): { allowed: boolean; retryAfter?: number } {
+  const now = Date.now();
+  const entry = RATE_LIMIT_MAP.get(key);
+  
+  if (!entry || now > entry.resetAt) {
+    // Reset or create new window
+    RATE_LIMIT_MAP.set(key, { count: 1, resetAt: now + windowMs });
+    return { allowed: true };
+  }
+  
+  if (entry.count >= maxRequests) {
+    return { allowed: false, retryAfter: Math.ceil((entry.resetAt - now) / 1000) };
+  }
+  
+  entry.count++;
+  return { allowed: true };
+}
+
+function cleanupRateLimits(): void {
+  const now = Date.now();
+  for (const [key, entry] of RATE_LIMIT_MAP.entries()) {
+    if (now > entry.resetAt) {
+      RATE_LIMIT_MAP.delete(key);
+    }
+  }
+}
 
 function readCache(key: string): Record<string, unknown> | null {
   const entry = SEARCH_CACHE.get(key);
@@ -131,6 +171,13 @@ function resolveTimeout(cfg: Record<string, unknown>): number {
 function resolveCacheTtlMs(cfg: Record<string, unknown>): number {
   const minutes = typeof cfg.cacheTtlMinutes === "number" ? Math.max(0, cfg.cacheTtlMinutes) : DEFAULT_CACHE_TTL_MINUTES;
   return Math.round(minutes * 60_000);
+}
+
+function resolveRateLimit(cfg: Record<string, unknown>): { maxRequests: number; windowMs: number } {
+  const rateLimitCfg = typeof cfg.rateLimit === "object" && cfg.rateLimit !== null ? cfg.rateLimit as Record<string, unknown> : {};
+  const maxRequests = typeof rateLimitCfg.maxRequests === "number" ? Math.max(1, Math.floor(rateLimitCfg.maxRequests)) : DEFAULT_RATE_LIMIT_MAX;
+  const windowMs = typeof rateLimitCfg.windowMs === "number" ? Math.max(1000, Math.floor(rateLimitCfg.windowMs)) : DEFAULT_RATE_LIMIT_WINDOW_MS;
+  return { maxRequests, windowMs };
 }
 
 function siteName(url: string): string | undefined {
@@ -203,11 +250,16 @@ const searxngPlugin = {
     const defaultEngines = resolveEngines(cfg);
     const defaultTimeout = resolveTimeout(cfg);
     const cacheTtlMs = resolveCacheTtlMs(cfg);
+    const rateLimit = resolveRateLimit(cfg);
 
     api.logger.info(
       `searxng: initialized (baseUrl=${baseUrl}, safeSearch=${defaultSafeSearch}, ` +
-        `language=${defaultLanguage}, timeout=${defaultTimeout}s, cacheTtl=${Math.round(cacheTtlMs / 60000)}min)`,
+        `language=${defaultLanguage}, timeout=${defaultTimeout}s, cacheTtl=${Math.round(cacheTtlMs / 60000)}min, ` +
+        `rateLimit=${rateLimit.maxRequests}/${rateLimit.windowMs}ms)`,
     );
+
+    // Periodic cleanup of rate limit entries
+    const rateLimitCleanupInterval = setInterval(cleanupRateLimits, 60000);
 
     api.registerTool(
       {
@@ -261,6 +313,26 @@ const searxngPlugin = {
           const callBaseUrl = typeof params.base_url === "string" && params.base_url.trim()
             ? params.base_url.trim()
             : baseUrl;
+
+          // --- rate limit check ---
+          const rateLimitKey = `searxng:${callBaseUrl}`;
+          const rateLimitResult = checkRateLimit(rateLimitKey, rateLimit.maxRequests, rateLimit.windowMs);
+          if (!rateLimitResult.allowed) {
+            api.logger.warn(`searxng: rate limit exceeded for ${callBaseUrl}`);
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: JSON.stringify({
+                    error: "rate_limit_exceeded",
+                    message: `Rate limit exceeded. Try again in ${rateLimitResult.retryAfter} seconds.`,
+                    retryAfter: rateLimitResult.retryAfter,
+                  }, null, 2),
+                },
+              ],
+              details: {},
+            };
+          }
 
           // --- cache ---
           const cacheKey = [
@@ -429,8 +501,10 @@ const searxngPlugin = {
       id: "openclaw-searxng",
       start: () => api.logger.info("searxng: service started"),
       stop: () => {
+        clearInterval(rateLimitCleanupInterval);
         SEARCH_CACHE.clear();
-        api.logger.info("searxng: service stopped, cache cleared");
+        RATE_LIMIT_MAP.clear();
+        api.logger.info("searxng: service stopped, cache and rate limits cleared");
       },
     });
   },

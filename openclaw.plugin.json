@@ -33,6 +33,20 @@
       "cacheTtlMinutes": {
         "type": "number",
         "description": "Cache TTL in minutes. Default: 15 (0 to disable)"
+      },
+      "rateLimit": {
+        "type": "object",
+        "description": "Rate limiting configuration",
+        "properties": {
+          "maxRequests": {
+            "type": "number",
+            "description": "Maximum requests per window. Default: 60"
+          },
+          "windowMs": {
+            "type": "number",
+            "description": "Time window in milliseconds. Default: 60000 (1 minute)"
+          }
+        }
       }
     }
   },
@@ -65,6 +79,19 @@
       "label": "Cache TTL (minutes)",
       "help": "How long to cache results. Set 0 to disable.",
       "advanced": true
+    },
+    "rateLimit": {
+      "label": "Rate Limiting",
+      "help": "Configure max requests per time window",
+      "advanced": true
+    },
+    "rateLimit.maxRequests": {
+      "label": "Max Requests",
+      "help": "Maximum requests allowed per window"
+    },
+    "rateLimit.windowMs": {
+      "label": "Window (ms)",
+      "help": "Time window in milliseconds"
     }
   }
 }

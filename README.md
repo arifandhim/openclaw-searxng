@@ -17,7 +17,7 @@ openclaw plugins install openclaw-searxng
 Or install from source:
 
 ```bash
-git clone https://github.com/thinkai/openclaw-searxng.git ~/.openclaw/extensions/openclaw-searxng
+git clone https://github.com/arifandhim/openclaw-searxng.git ~/.openclaw/extensions/openclaw-searxng
 cd ~/.openclaw/extensions/openclaw-searxng
 npm install --omit=dev
 ```
@@ -204,13 +204,13 @@ searxng_search(
 ## Links
 
 - npm: [openclaw-searxng](https://www.npmjs.com/package/openclaw-searxng)
-- GitHub: [thinkai/openclaw-searxng](https://github.com/thinkai/openclaw-searxng)
+- GitHub: [arifandhim/openclaw-searxng](https://github.com/arifandhim/openclaw-searxng)
 - SearXNG: [github.com/searxng/searxng](https://github.com/searxng/searxng)
 - OpenClaw plugin docs: [docs.openclaw.ai/tools/plugin](https://docs.openclaw.ai/tools/plugin)
 
 ## Author
 
-[ThinkAI](https://thinkai.dev)
+[arifandhim](https://github.com/arifandhim)
 
 ## License
 

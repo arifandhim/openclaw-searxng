@@ -4,14 +4,14 @@
   "type": "module",
   "description": "SearXNG local search plugin for OpenClaw — exposes searxng_search tool for private, local web search with structured JSON results",
   "license": "MIT",
-  "author": "ThinkAI",
+  "author": "arifandhim",
   "repository": {
     "type": "git",
-    "url": "https://github.com/thinkai/openclaw-searxng.git"
+    "url": "https://github.com/arifandhim/openclaw-searxng.git"
   },
-  "homepage": "https://github.com/thinkai/openclaw-searxng#readme",
+  "homepage": "https://github.com/arifandhim/openclaw-searxng#readme",
   "bugs": {
-    "url": "https://github.com/thinkai/openclaw-searxng/issues"
+    "url": "https://github.com/arifandhim/openclaw-searxng/issues"
   },
   "keywords": [
     "openclaw",

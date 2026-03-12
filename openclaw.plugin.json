@@ -1,0 +1,70 @@
+{
+  "id": "openclaw-searxng",
+  "kind": "tools",
+  "skills": ["./skills"],
+  "name": "SearXNG Local Search",
+  "description": "Local web search via SearXNG instance. Provides searxng_search tool for private, structured web search with full metadata, pagination, time filtering, and engine selection. No external API calls — all search data stays local.",
+  "version": "1.0.0",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "baseUrl": {
+        "type": "string",
+        "description": "SearXNG instance URL (defaults to SEARXNG_URL env var or http://localhost:8888)"
+      },
+      "defaultSafeSearch": {
+        "type": "integer",
+        "enum": [0, 1, 2],
+        "description": "Default safe search level: 0=off, 1=moderate, 2=strict. Default: 0"
+      },
+      "defaultLanguage": {
+        "type": "string",
+        "description": "Default language code (e.g., 'en-US', 'id-ID', 'auto'). Default: 'auto'"
+      },
+      "defaultEngines": {
+        "type": "string",
+        "description": "Default search engines (comma-separated, e.g., 'google,brave,duckduckgo')"
+      },
+      "timeoutSeconds": {
+        "type": "number",
+        "description": "Timeout in seconds for search requests. Default: 30"
+      },
+      "cacheTtlMinutes": {
+        "type": "number",
+        "description": "Cache TTL in minutes. Default: 15 (0 to disable)"
+      }
+    }
+  },
+  "uiHints": {
+    "baseUrl": {
+      "label": "SearXNG URL",
+      "placeholder": "http://localhost:8888",
+      "help": "URL of your local SearXNG instance"
+    },
+    "defaultSafeSearch": {
+      "label": "Safe Search",
+      "help": "0=off, 1=moderate, 2=strict"
+    },
+    "defaultLanguage": {
+      "label": "Default Language",
+      "placeholder": "auto",
+      "help": "Language code like 'en-US', 'id-ID', or 'auto'"
+    },
+    "defaultEngines": {
+      "label": "Default Engines",
+      "placeholder": "google,brave",
+      "help": "Comma-separated list of search engines",
+      "advanced": true
+    },
+    "timeoutSeconds": {
+      "label": "Timeout (seconds)",
+      "advanced": true
+    },
+    "cacheTtlMinutes": {
+      "label": "Cache TTL (minutes)",
+      "help": "How long to cache results. Set 0 to disable.",
+      "advanced": true
+    }
+  }
+}

@@ -258,6 +258,94 @@ function sleep(ms: number): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Headless Browser Configuration
+// ---------------------------------------------------------------------------
+
+type HeadlessBrowserConfig = {
+  enabled: boolean;
+  waitForSelector: string;
+  waitTimeMs: number;
+  timeoutSeconds: number;
+};
+
+function resolveHeadlessBrowser(cfg: Record<string, unknown>): HeadlessBrowserConfig {
+  const hbCfg = typeof cfg.headlessBrowser === "object" && cfg.headlessBrowser !== null ? cfg.headlessBrowser as Record<string, unknown> : {};
+  return {
+    enabled: typeof hbCfg.enabled === "boolean" ? hbCfg.enabled : false,
+    waitForSelector: typeof hbCfg.waitForSelector === "string" ? hbCfg.waitForSelector : "body",
+    waitTimeMs: typeof hbCfg.waitTimeMs === "number" ? Math.max(0, hbCfg.waitTimeMs) : 3000,
+    timeoutSeconds: typeof hbCfg.timeoutSeconds === "number" ? Math.max(5, hbCfg.timeoutSeconds) : 30,
+  };
+}
+
+// Lazy-loaded Puppeteer instance
+let puppeteerInstance: typeof import("puppeteer") | null = null;
+
+async function getPuppeteer(): Promise<typeof import("puppeteer") | null> {
+  if (puppeteerInstance) return puppeteerInstance;
+  try {
+    puppeteerInstance = await import("puppeteer");
+    return puppeteerInstance;
+  } catch {
+    return null;
+  }
+}
+
+async function extractWithHeadlessBrowser(
+  url: string,
+  config: HeadlessBrowserConfig,
+  logger: { warn: (msg: string) => void }
+): Promise<{ html: string; title: string } | null> {
+  const puppeteer = await getPuppeteer();
+  if (!puppeteer) {
+    logger.warn("Puppeteer not installed. Run: npm install puppeteer");
+    return null;
+  }
+
+  try {
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1280, height: 720 });
+
+    // Set timeout
+    page.setDefaultTimeout(config.timeoutSeconds * 1000);
+    page.setDefaultNavigationTimeout(config.timeoutSeconds * 1000);
+
+    // Navigate to URL
+    await page.goto(url, { waitUntil: "networkidle2" });
+
+    // Wait for selector if specified
+    if (config.waitForSelector && config.waitForSelector !== "body") {
+      try {
+        await page.waitForSelector(config.waitForSelector, { timeout: config.waitTimeMs });
+      } catch {
+        // Continue even if selector not found
+      }
+    }
+
+    // Additional wait time for JavaScript execution
+    if (config.waitTimeMs > 0) {
+      await sleep(config.waitTimeMs);
+    }
+
+    // Get content
+    const html = await page.content();
+    const title = await page.title();
+
+    await browser.close();
+    return { html, title };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.warn(`Headless browser extraction failed: ${msg}`);
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // HTML Content Extraction (Simple implementation)
 // ---------------------------------------------------------------------------
 
@@ -358,6 +446,9 @@ const SearXNGExtractSchema = Type.Object({
   include_images: Type.Optional(Type.Boolean({ description: "Include image URLs. Default: true." })),
   include_links: Type.Optional(Type.Boolean({ description: "Include link URLs. Default: true." })),
   max_content_length: Type.Optional(Type.Number({ description: "Maximum content length in characters. Default: 10000." })),
+  use_headless: Type.Optional(Type.Boolean({ description: "Use headless browser for JavaScript rendering. Default: from config or false." })),
+  wait_for_selector: Type.Optional(Type.String({ description: "CSS selector to wait for before extracting (e.g., 'tbody tr', '.content')." })),
+  wait_time_ms: Type.Optional(Type.Number({ description: "Time to wait for JavaScript execution in milliseconds. Default: 3000." })),
 });
 
 const SearXNGCrawlSchema = Type.Object({
@@ -406,11 +497,13 @@ const searxngPlugin = {
     const cacheTtlMs = resolveCacheTtlMs(cfg);
     const rateLimit = resolveRateLimit(cfg);
     const responseFormat = resolveResponseFormat(cfg);
+    const headlessBrowser = resolveHeadlessBrowser(cfg);
 
     api.logger.info(
       `searxng: initialized (baseUrl=${baseUrl}, safeSearch=${defaultSafeSearch}, ` +
       `language=${defaultLanguage}, timeout=${defaultTimeout}s, cacheTtl=${Math.round(cacheTtlMs / 60000)}min, ` +
-      `rateLimit=${rateLimit.maxRequests}/${rateLimit.windowMs}ms)`
+      `rateLimit=${rateLimit.maxRequests}/${rateLimit.windowMs}ms, ` +
+      `headlessBrowser=${headlessBrowser.enabled})`
     );
 
     const rateLimitCleanupInterval = setInterval(cleanupRateLimits, 60000);
@@ -545,6 +638,7 @@ const searxngPlugin = {
         label: "SearXNG Extract",
         description:
           "Extract clean, readable content from a URL. Removes navigation, ads, and clutter. " +
+          "Supports headless browser for JavaScript rendering. " +
           "Returns title, content, text, word count, images, and links.",
         parameters: SearXNGExtractSchema,
         async execute(_toolCallId: string, params: Record<string, unknown>) {
@@ -560,45 +654,100 @@ const searxngPlugin = {
             return { content: [{ type: "text" as const, text: JSON.stringify({ ...cached, cached: true }, null, 2) }], details: {} };
           }
 
-          try {
-            const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), defaultTimeout * 1000);
+          // Determine if we should use headless browser
+          const headlessConfig = resolveHeadlessBrowser(cfg);
+          const useHeadless = typeof params.use_headless === "boolean" 
+            ? params.use_headless 
+            : headlessConfig.enabled;
 
-            const res = await fetch(url, {
-              method: "GET",
-              headers: { "User-Agent": "Mozilla/5.0 (compatible; SearXNG-Extract/1.0)" },
-              signal: controller.signal,
-            });
+          let html: string;
+          let pageTitle: string;
 
-            clearTimeout(timer);
+          if (useHeadless) {
+            // Use headless browser
+            const hbConfig: HeadlessBrowserConfig = {
+              enabled: true,
+              waitForSelector: typeof params.wait_for_selector === "string" ? params.wait_for_selector : headlessConfig.waitForSelector,
+              waitTimeMs: typeof params.wait_time_ms === "number" ? params.wait_time_ms : headlessConfig.waitTimeMs,
+              timeoutSeconds: headlessConfig.timeoutSeconds,
+            };
 
-            if (!res.ok) {
-              return { content: [{ type: "text" as const, text: JSON.stringify({ error: "fetch_error", status: res.status, url }, null, 2) }], details: {} };
+            api.logger.info(`searxng_extract: Using headless browser for ${url}`);
+            const hbResult = await extractWithHeadlessBrowser(url, hbConfig, api.logger);
+            
+            if (hbResult) {
+              html = hbResult.html;
+              pageTitle = hbResult.title;
+            } else {
+              // Fallback to regular fetch
+              api.logger.warn(`searxng_extract: Headless browser failed, falling back to regular fetch`);
+              const res = await fetch(url, {
+                method: "GET",
+                headers: { "User-Agent": "Mozilla/5.0 (compatible; SearXNG-Extract/1.0)" },
+              });
+              if (!res.ok) {
+                return { content: [{ type: "text" as const, text: JSON.stringify({ error: "fetch_error", status: res.status, url }, null, 2) }], details: {} };
+              }
+              html = await res.text();
+              pageTitle = "";
             }
+          } else {
+            // Regular fetch
+            try {
+              const controller = new AbortController();
+              const timer = setTimeout(() => controller.abort(), defaultTimeout * 1000);
 
-            const html = await res.text();
-            const result = extractFromHTML(html, url);
+              const res = await fetch(url, {
+                method: "GET",
+                headers: { "User-Agent": "Mozilla/5.0 (compatible; SearXNG-Extract/1.0)" },
+                signal: controller.signal,
+              });
 
-            const maxLength = typeof params.max_content_length === "number" ? params.max_content_length : 10000;
-            if (result.content.length > maxLength) {
-              result.content = result.content.slice(0, maxLength) + "...";
+              clearTimeout(timer);
+
+              if (!res.ok) {
+                return { content: [{ type: "text" as const, text: JSON.stringify({ error: "fetch_error", status: res.status, url }, null, 2) }], details: {} };
+              }
+
+              html = await res.text();
+              pageTitle = "";
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              return { content: [{ type: "text" as const, text: JSON.stringify({ error: "extract_error", message: msg, url }, null, 2) }], details: {} };
             }
-
-            if (params.include_images === false) {
-              result.images = [];
-            }
-
-            if (params.include_links === false) {
-              result.links = [];
-            }
-
-            writeCache(EXTRACT_CACHE, cacheKey, result as Record<string, unknown>, cacheTtlMs);
-
-            return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} };
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            return { content: [{ type: "text" as const, text: JSON.stringify({ error: "extract_error", message: msg, url }, null, 2) }], details: {} };
           }
+
+          const result = extractFromHTML(html, url);
+          
+          // Use page title from headless browser if available
+          if (pageTitle && !result.title) {
+            result.title = pageTitle;
+          }
+
+          const maxLength = typeof params.max_content_length === "number" ? params.max_content_length : 10000;
+          if (result.content.length > maxLength) {
+            result.content = result.content.slice(0, maxLength) + "...";
+          }
+
+          if (params.include_images === false) {
+            result.images = [];
+          }
+
+          if (params.include_links === false) {
+            result.links = [];
+          }
+
+          // Add metadata about extraction method
+          const resultWithMeta = {
+            ...result,
+            extractionMethod: useHeadless ? "headless_browser" : "static_fetch",
+            headlessBrowserUsed: useHeadless,
+          };
+
+          writeCache(EXTRACT_CACHE, cacheKey, resultWithMeta as Record<string, unknown>, cacheTtlMs);
+
+          return { content: [{ type: "text" as const, text: JSON.stringify(resultWithMeta, null, 2) }], details: {} };
+        }
         },
       },
       { source: "openclaw-searxng" },

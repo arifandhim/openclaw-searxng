@@ -78,6 +78,28 @@
             "description": "Fields to include in results (empty = all). Default: []"
           }
         }
+      },
+      "headlessBrowser": {
+        "type": "object",
+        "description": "Headless browser configuration for JavaScript rendering",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Enable headless browser for JavaScript rendering. Default: false"
+          },
+          "waitForSelector": {
+            "type": "string",
+            "description": "CSS selector to wait for before extracting (e.g., 'tbody tr', '.content'). Default: 'body'"
+          },
+          "waitTimeMs": {
+            "type": "number",
+            "description": "Time to wait for JavaScript execution in milliseconds. Default: 3000"
+          },
+          "timeoutSeconds": {
+            "type": "number",
+            "description": "Browser timeout in seconds. Default: 30"
+          }
+        }
       }
     }
   },
@@ -152,6 +174,28 @@
     "responseFormat.fields": {
       "label": "Fields",
       "help": "Specific fields to include (empty = all)"
+    },
+    "headlessBrowser": {
+      "label": "Headless Browser",
+      "help": "Configure JavaScript rendering with Puppeteer",
+      "advanced": true
+    },
+    "headlessBrowser.enabled": {
+      "label": "Enable Headless Browser",
+      "help": "Toggle JavaScript rendering for dynamic content"
+    },
+    "headlessBrowser.waitForSelector": {
+      "label": "Wait For Selector",
+      "placeholder": "body",
+      "help": "CSS selector to wait for before extracting content"
+    },
+    "headlessBrowser.waitTimeMs": {
+      "label": "Wait Time (ms)",
+      "help": "Time to wait for JavaScript execution"
+    },
+    "headlessBrowser.timeoutSeconds": {
+      "label": "Browser Timeout (s)",
+      "help": "Timeout for browser operations"
     }
   }
 }

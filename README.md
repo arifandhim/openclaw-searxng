@@ -7,10 +7,12 @@ Exposes **5 agent tools** for comprehensive web research:
 | Tool | Description | Tavily Equivalent |
 |------|-------------|-------------------|
 | `searxng_search` | Local web search with structured JSON results | `tavily_search` |
-| `searxng_extract` | Extract clean content from URLs | `tavily_extract` |
+| `searxng_extract` | Extract clean content from URLs (with optional headless browser) | `tavily_extract` |
 | `searxng_crawl` | Crawl websites and extract page content | `tavily_crawl` |
 | `searxng_map` | Discover and list URLs from websites | `tavily_map` |
 | `searxng_research` | Multi-step research with query expansion | `tavily_research` |
+
+**✨ New: Headless Browser Support** - Optional JavaScript rendering for dynamic content (Google Trends, SPAs, etc.)
 
 ---
 
@@ -61,6 +63,12 @@ Add to your `~/.openclaw/openclaw.json`:
             "includeUnresponsive": true,
             "maxResults": 0,
             "fields": []
+          },
+          "headlessBrowser": {
+            "enabled": false,
+            "waitForSelector": "body",
+            "waitTimeMs": 3000,
+            "timeoutSeconds": 30
           }
         }
       }
@@ -188,6 +196,9 @@ Extract clean, readable content from any URL.
 | `include_images` | boolean | ❌ No | true | Include image URLs |
 | `include_links` | boolean | ❌ No | true | Include link URLs |
 | `max_content_length` | number | ❌ No | 10000 | Max content length in characters |
+| `use_headless` | boolean | ❌ No | false | Use headless browser for JS rendering |
+| `wait_for_selector` | string | ❌ No | "body" | CSS selector to wait for |
+| `wait_time_ms` | number | ❌ No | 3000 | Time to wait for JS execution |
 
 **Examples:**
 
@@ -200,6 +211,22 @@ searxng_extract("https://example.com/article", include_images=False)
 
 # Limited content
 searxng_extract("https://example.com", max_content_length=5000)
+
+# With headless browser (for JavaScript-heavy sites)
+searxng_extract(
+    "https://trends.google.com/trending?geo=ID",
+    use_headless=True,
+    wait_for_selector="tbody tr",
+    wait_time_ms=5000
+)
+```
+
+**Headless Browser Setup:**
+
+```bash
+# Install Puppeteer (optional - only needed for JS rendering)
+cd ~/.openclaw/extensions/openclaw-searxng
+npm install puppeteer
 ```
 
 **Response:**
